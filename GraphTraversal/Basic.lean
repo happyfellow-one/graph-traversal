@@ -97,17 +97,35 @@ theorem Array.foldl_monoid
 
 section
 
+namespace Std.HashSet
 variable {α : Type} [BEq α] [Hashable α]
 
-def Std.HashSet.toFinset [DecidableEq α] (a : HashSet α) : Finset α := a.toList.toFinset
+@[simp, grind]
+def toFinset [DecidableEq α] (a : HashSet α) : Finset α := a.toList.toFinset
 
-def Std.HashSet.mem_toFinset
+instance [DecidableEq α] : HasSubset (HashSet α) :=
+  ⟨fun (s t : HashSet α) => s.toFinset ⊆ t.toFinset⟩
+
+@[simp, grind]
+theorem subset_relf [DecidableEq α] (a : HashSet α) : a ⊆ a := by
+  simp [HasSubset.Subset]
+
+@[simp, grind]
+theorem subset_trans
+    [DecidableEq α]
+    {a b c : HashSet α}
+    (h1 : a ⊆ b)
+    (h2 : b ⊆ c) :
+    a ⊆ c := by
+  simp [HasSubset.Subset] at *; grind
+
+def mem_toFinset
     [DecidableEq α] [BEq α] [LawfulBEq α] [Hashable α]
     {s : HashSet α} {x : α} :
     x ∈ HashSet.toFinset s ↔ x ∈ s := by
-    unfold toFinset; simp
+  unfold toFinset; simp
 
-theorem HashSet.toFinset_toList_insert
+theorem toFinset_toList_insert
     [DecidableEq α]
     [LawfulBEq α]
     (a : HashSet α) (x : α) (h : x ∉ a) :
@@ -116,12 +134,12 @@ theorem HashSet.toFinset_toList_insert
     rw [a.mem_toFinset]; trivial
   simpa using (Finset.toList_insert (s := a.toFinset) (a := x) h)
 
-theorem HashSet.toFinset_insert
+theorem toFinset_insert
     [DecidableEq α]
     [LawfulBEq α]
     (a : HashSet α)
     (x : α) :
-    (a.insert x).toFinset = insert x a.toFinset := by
+    (a.insert x).toFinset = Insert.insert x a.toFinset := by
   apply Finset.ext
   intro y
   apply Iff.intro
@@ -141,10 +159,10 @@ theorem HashSet.toFinset_insert
       rw [HashSet.mem_toFinset, HashSet.mem_insert]
       right; rw [HashSet.mem_toFinset] at h; trivial
 
-def HashSet.diff (a b : HashSet α) : HashSet α :=
+def diff (a b : HashSet α) : HashSet α :=
   a.fold (fun acc x => acc.erase x) b
 
-def HashSet.attach
+def attach
   [LawfulBEq α]
   (a : HashSet α) :
   HashSet { x // x ∈ a } :=
@@ -152,7 +170,7 @@ def HashSet.attach
     ⟨x, by rw [HashSet.mem_toArray] at xmem; trivial⟩)
   |> HashSet.ofArray
 
-theorem HashSet.size_not_empty
+theorem size_not_empty
   (a : HashSet α)
   (hnotempty : ¬a.isEmpty = true)
   : a.size > 0 := by
@@ -163,7 +181,7 @@ theorem HashSet.size_not_empty
     have : a.isEmpty = true := by rw [HashSet.isEmpty_eq_size_eq_zero, this]; simp
     trivial
 
-theorem HashSet.subset_sizes
+theorem subset_sizes
   [LawfulBEq α]
   (a b : HashSet α)
   (subset : ∀ x ∈ a, x ∈ b)
@@ -221,63 +239,7 @@ decreasing_by
     apply HashSet.size_erase
   simp [hxina] at this; assumption
 
--- set_option pp.all true
-
-def HashSet.mem_of_big_union
-  (x : α)
-  (s : Array (HashSet α))
-  (h : x ∈ s.foldl (· ∪ ·) ∅)
-  : ∃ (i : ℕ) (_ : i < s.size), x ∈ s[i] := by
-  let union : HashSet α := s.foldl (· ∪ ·) ∅
-  have : ∃ (i : ℕ) (_ : i < s.size), x ∈ s[i] := by
-    suffices ∃ (i : ℕ) (_ : i < s.size), s.size ≤ s.size → x ∈ s[i] by simpa using this
-    apply Array.foldl_induction
-      (as := s)
-      (motive := λ n set =>
-        x ∈ s.foldl (· ∪ ·) ∅ 0 n →
-          ∃ (i : ℕ) (_ : i < n), (hb : n ≤ s.size) → x ∈ s[i]'?_)
-      (init := ∅)
-      (f := (· ∪ ·))
-      (h0 := ?h0)
-      (hf := ?hf)
-    rotate_right
-    · omega
-    · assumption
-    · intro inEmpty
-      rw [Array.foldl_0_len] at inEmpty
-      simp at inEmpty
-    · intro i b ih hinfold
-      if hlast : x ∈ s[i]
-      then
-        exists i
-        have : (i : ℕ) < i + 1 := by omega
-        exists this
-        intro hb
-        simpa using hlast
-      else
-        let mid : HashSet α := s[i]
-        have : ∃ (s1 s2: Array _), s = s1 ++ #[mid] ++ s2 := by
-          simpa using (Array.getElem_splits s i)
-        obtain ⟨s1, s2, s1s2eq⟩ := this
-        have hinfold' : x ∈ s.foldl (· ∪ ·) ∅ 0 i := by
-          have hsize : s.size = (s1 ++ #[mid] ++ s2).size := by rw (occs := .pos [1]) [s1s2eq]
-          have i' : Fin (s1 ++ #[mid] ++ s2).size := Fin.cast hsize i
-          simp_rw [s1s2eq] at hinfold
-          rw [Array.foldl_append'] at hinfold
-          rw [Array.foldl_append'] at hinfold
-          simp at hinfold
-          sorry
-        have : ∃ (i' : ℕ) (hilen : i' < i), ∀ (hb : i ≤ s.size), x ∈ s[i'] := by
-          sorry
-        obtain ⟨ i', hilen, xi ⟩ := this
-        exists i'
-        have : (i' : ℕ) < i + 1 := by omega
-        exists this
-        intro hb
-        have hilen' : i' < i := by omega
-        grind
-  assumption
-
+end Std.HashSet
 end
 
 variable {V : Type} [DecidableEq V] [LawfulBEq V] [EquivBEq V] [Hashable V] [LawfulHashable V]
@@ -304,24 +266,32 @@ namespace FinGraph
 def reachability'
   (g : FinGraph V)
   (v : V)
-  (_vInNodes : v ∈ g.nodes)
+  (_vInNodes : v ∈ g.nodes) -- needed for termination proof
   (visited : HashSet V)
-  : HashSet V :=
+  : {x : HashSet V // visited ⊆ x} :=
   if visited.contains v
-  then visited
+  then ⟨visited, (by grind)⟩
   else
     let visited' := visited.insert v
-    g.edges v
-    |> HashSet.attach
-    |> HashSet.fold (fun acc ⟨w, wmem⟩  =>
-      have wInNodes : w ∈ g.nodes := by apply g.edgesInNodes; exact wmem
-      acc ∪ reachability' g w wInNodes visited')
-      ∅
+    have visited'_1 : visited ⊆ visited' := by
+      unfold visited'
+      simp only [HasSubset.Subset]
+      rw [HashSet.toFinset_insert]
+      grind
+    have visited'_2 : visited'.toFinset ⊆ visited'.toFinset := by grind
+    let ⟨reached, hreached⟩ :=
+      g.edges v
+      |> HashSet.attach
+      |> HashSet.fold (fun ⟨acc, hacc⟩  ⟨w, wmem⟩  =>
+        have wInNodes : w ∈ g.nodes := by apply g.edgesInNodes; exact wmem
+        let ⟨reached', hreached⟩ := reachability' g w wInNodes acc
+        ⟨reached', (by grind)⟩)
+        (⟨visited', visited'_2⟩ : {x : HashSet V // visited' ⊆ x})
+    ⟨reached, (by grind)⟩
 termination_by (g.nodes.toFinset \ visited.toFinset).card
 decreasing_by
   -- TODO: how to make this proof nicer, similar to the other one?
   have h : v ∉ visited := by grind
-  rw [HashSet.toFinset_insert]
   apply Finset.card_lt_card
   rw [Finset.ssubset_iff_subset_ne]
   apply And.intro
@@ -329,18 +299,31 @@ decreasing_by
     intros x xmem
     rw [Finset.mem_sdiff] at *
     have ⟨xmem, xnotmem⟩ := xmem
-    rw [Finset.mem_insert] at xnotmem
+    have xnotmem : x ∉ (visited.insert v).toFinset := by
+      apply (Finset.not_mem_subset hacc)
+      trivial
+    rw [HashSet.toFinset_insert, Finset.mem_insert] at xnotmem
     apply And.intro
     · exact xmem
     · intro xin
       grind
   · intro heq
-    have : v ∈ g.nodes.toFinset \ visited.toFinset := by
+    have hv1 : v ∈ g.nodes.toFinset \ visited.toFinset := by
       rw [Finset.mem_sdiff]
       apply And.intro
       · rw [HashSet.mem_toFinset]; trivial
       · rw [HashSet.mem_toFinset]; trivial
-    grind
+    have hv2 : v ∈ acc := by
+      rw [<-HashSet.mem_toFinset]
+      apply (Finset.mem_of_subset hacc ?_)
+      unfold visited'
+      rw [HashSet.toFinset_insert]
+      grind
+    rw [<-heq] at hv1
+    rw [Finset.mem_sdiff] at hv1
+    have ⟨_, vnotin⟩ := hv1
+    rw [HashSet.mem_toFinset] at vnotin
+    trivial
 
 def reachability'_p
   (g : FinGraph V)
