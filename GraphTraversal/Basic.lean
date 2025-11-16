@@ -375,11 +375,14 @@ theorem reachability'_p_equiv
   fun_induction reachability' g v vInNodes visited
   · expose_names
     have : v_1 ∈ visited := by grind
-    unfold reachability'_p; simp; intros
+    unfold reachability'_p; simp; intros h'
+    rw [HashSet.mem_toFinset] at h'
     trivial
   · expose_names
-    have : v_1 ∉ visited := by grind
+    have hv : v_1 ∉ visited := by grind
+    have hv' : v_1 ∉ visited.toFinset := by rw [HashSet.mem_toFinset]; trivial
     unfold reachability'_p; simp [*]
+    -- TODO how that fold with unions and Finset.biUnion are samesies.
     sorry
 
 
