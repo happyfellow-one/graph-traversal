@@ -122,7 +122,24 @@ theorem HashSet.toFinset_insert
     (a : HashSet α)
     (x : α) :
     (a.insert x).toFinset = insert x a.toFinset := by
-  sorry
+  apply Finset.ext
+  intro y
+  apply Iff.intro
+  · intro h
+    rw [HashSet.mem_toFinset, HashSet.mem_insert] at h
+    simp at h
+    cases h with
+    | inl h => rw [h]; grind
+    | inr h =>
+      rw [Finset.mem_insert]
+      right; rw [HashSet.mem_toFinset]; trivial
+  · intro h
+    rw [Finset.mem_insert] at h
+    cases h with
+    | inl h => rw [h, HashSet.mem_toFinset]; grind
+    | inr h =>
+      rw [HashSet.mem_toFinset, HashSet.mem_insert]
+      right; rw [HashSet.mem_toFinset] at h; trivial
 
 def HashSet.diff (a b : HashSet α) : HashSet α :=
   a.fold (fun acc x => acc.erase x) b
