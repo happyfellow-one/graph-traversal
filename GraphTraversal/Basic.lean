@@ -319,6 +319,7 @@ def reachability'
       ∅
 termination_by (g.nodes.toFinset \ visited.toFinset).card
 decreasing_by
+  -- TODO: how to make this proof nicer, similar to the other one?
   have h : v ∉ visited := by grind
   rw [HashSet.toFinset_insert]
   apply Finset.card_lt_card
@@ -345,38 +346,39 @@ def reachability'_p
   (g : FinGraph V)
   (v : V)
   (_vInNodes : v ∈ g.nodes)
-  (visited : List V)
-  : List V :=
+  (visited : Finset V)
+  : Finset V :=
   if hinv : v ∈ visited
   then visited
   else
-    let visited' := v :: visited
+    let visited' := insert v visited
     let a :=
       g.edges v
-      |> HashSet.toList
-      |> List.attach
-    a.flatMap (fun ⟨w, wmem⟩  =>
-      have wmem' : w ∈ g.edges v := by simp at wmem; trivial
+      |> HashSet.toFinset
+      |> Finset.attach
+    a.biUnion (fun ⟨w, wmem⟩  =>
+      have wmem' : w ∈ g.edges v := by rw [HashSet.mem_toFinset] at wmem; trivial
       have wInNodes : w ∈ g.nodes := by apply g.edgesInNodes; exact wmem'
       reachability'_p g w wInNodes visited')
-termination_by (List.diff g.nodes.toList visited).length
-decreasing_by apply List.diff_length <;> grind
+termination_by (g.nodes.toFinset \ visited).card
+decreasing_by
+ -- TODO finish
+  sorry
 
 theorem reachability'_p_equiv
   (g : FinGraph V)
   (v : V)
   (vInNodes : v ∈ g.nodes)
-  (visited : HashSet V)
-  (visitedInNodes : ∀ w ∈ visited, w ∈ g.nodes) :
-  (reachability' g v vInNodes visited visitedInNodes).toList.toFinset
-  = reachability'_p g v vInNodes visited.toList.toFinset (by simp; grind) := by
-  fun_induction reachability' g v vInNodes visited visitedInNodes
+  (visited : HashSet V) :
+  HashSet.toFinset (reachability' g v vInNodes visited)
+  = reachability'_p g v vInNodes visited.toFinset := by
+  fun_induction reachability' g v vInNodes visited
   · expose_names
-    have : v_1 ∈ visited_1 := by grind
+    have : v_1 ∈ visited := by grind
     unfold reachability'_p; simp; intros
     trivial
   · expose_names
-    have : v_1 ∉ visited_1 := by grind
+    have : v_1 ∉ visited := by grind
     unfold reachability'_p; simp [*]
     sorry
 
