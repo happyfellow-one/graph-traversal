@@ -99,8 +99,30 @@ section
 
 variable {α : Type} [BEq α] [Hashable α]
 
-theorem HashSet.toList_insert (a : HashSet α) (x : α) (h : x ∉ a) :
-  List.Perm (a.insert x).toList (x :: a.toList) := by sorry
+def Std.HashSet.toFinset [DecidableEq α] (a : HashSet α) : Finset α := a.toList.toFinset
+
+def Std.HashSet.mem_toFinset
+    [DecidableEq α] [BEq α] [LawfulBEq α] [Hashable α]
+    {s : HashSet α} {x : α} :
+    x ∈ HashSet.toFinset s ↔ x ∈ s := by
+    unfold toFinset; simp
+
+theorem HashSet.toFinset_toList_insert
+    [DecidableEq α]
+    [LawfulBEq α]
+    (a : HashSet α) (x : α) (h : x ∉ a) :
+    List.Perm ( (a.toFinset ∪ {x}).toList ) (x :: a.toFinset.toList) := by
+  have h : x ∉ a.toFinset := by
+    rw [a.mem_toFinset]; trivial
+  simpa using (Finset.toList_insert (s := a.toFinset) (a := x) h)
+
+theorem HashSet.toFinset_insert
+    [DecidableEq α]
+    [LawfulBEq α]
+    (a : HashSet α)
+    (x : α) :
+    (a.insert x).toFinset = insert x a.toFinset := by
+  sorry
 
 def HashSet.diff (a b : HashSet α) : HashSet α :=
   a.fold (fun acc x => acc.erase x) b
@@ -265,7 +287,7 @@ namespace FinGraph
 def reachability'
   (g : FinGraph V)
   (v : V)
-  (vInNodes : v ∈ g.nodes)
+  (_vInNodes : v ∈ g.nodes)
   (visited : HashSet V)
   : HashSet V :=
   if visited.contains v
@@ -278,12 +300,29 @@ def reachability'
       have wInNodes : w ∈ g.nodes := by apply g.edgesInNodes; exact wmem
       acc ∪ reachability' g w wInNodes visited')
       ∅
-termination_by (List.diff g.nodes.toList visited.toList).length
+termination_by (g.nodes.toFinset \ visited.toFinset).card
 decreasing_by
-  -- TODO: use List.Perm.diff_* to show that I can rewrite the goal to the
-  -- form needed by List.diff_length
-  rw [HashSet.toList_insert]
-  apply List.diff_length <;> grind
+  have h : v ∉ visited := by grind
+  rw [HashSet.toFinset_insert]
+  apply Finset.card_lt_card
+  rw [Finset.ssubset_iff_subset_ne]
+  apply And.intro
+  · rw [Finset.subset_iff]
+    intros x xmem
+    rw [Finset.mem_sdiff] at *
+    have ⟨xmem, xnotmem⟩ := xmem
+    rw [Finset.mem_insert] at xnotmem
+    apply And.intro
+    · exact xmem
+    · intro xin
+      grind
+  · intro heq
+    have : v ∈ g.nodes.toFinset \ visited.toFinset := by
+      rw [Finset.mem_sdiff]
+      apply And.intro
+      · rw [HashSet.mem_toFinset]; trivial
+      · rw [HashSet.mem_toFinset]; trivial
+    grind
 
 def reachability'_p
   (g : FinGraph V)
