@@ -263,6 +263,76 @@ example : FinGraph ℕ :=
 
 namespace FinGraph
 
+def reachability''
+    (fuel : ℕ)
+    (g : FinGraph V)
+    (v : V)
+    (visited : HashSet V) :
+    HashSet V :=
+  if visited.contains v then visited
+  else if fuel = 0 then visited
+  else
+    let visited' := visited.insert v
+    (g.edges v).fold (fun acc w => reachability'' (fuel - 1) g w acc) visited'
+
+def reachability_actual
+    (g : FinGraph V)
+    (v : V)
+    (visited : HashSet V) :
+    HashSet V := reachability'' (g.nodes.size) g v visited
+
+def reachability''_1
+    (fuel : ℕ)
+    (g : FinGraph V)
+    (v : V)
+    (visited : Finset V) :
+    Finset V :=
+  if v ∈ visited then visited
+  else if fuel = 0 then visited
+  else
+    let visited' := insert v visited
+    (g.edges v).fold (fun acc w => reachability''_1 (fuel - 1) g w acc) visited'
+
+theorem reachability_equiv_1
+    (fuel : ℕ)
+    (g : FinGraph V)
+    (v : V)
+    (visited : HashSet V) :
+    (reachability'' fuel g v visited).toFinset
+    = reachability''_1 fuel g v visited.toFinset := by
+  fun_induction reachability'' fuel g v visited
+  all_goals expose_names
+  -- in visited
+  · have h : v ∈ visited := by grind
+    unfold reachability''_1
+    simp [h]
+  -- out of fuel
+  · unfold reachability''_1
+    simp
+  -- let's goooo
+  · have h : v ∉ visited := by grind
+    unfold reachability''_1
+    simp [h, h_1]
+    have h' : insert v visited.toList.toFinset = (visited.insert v).toFinset := by
+      simp_rw [HashSet.toFinset_insert]
+      simp
+    rw [h']
+    unfold visited'
+    simp [HashSet.fold_eq_foldl_toList]
+    have hl (vs : HashSet V) (l : List V) :
+      (l.foldl (fun acc w => reachability'' (fuel - 1) g w acc) vs).toFinset
+      = l.foldl (fun acc w => reachability''_1 (fuel - 1) g w acc) vs.toFinset := by
+      induction l generalizing vs
+      case nil => simp
+      case cons head tail ih =>
+        simp
+        conv =>
+          rhs; arg 2; arg 4; change vs.toFinset
+        rw [<-ih1]
+        rw [<-ih]
+        simp
+    grind
+
 def reachability'
   (g : FinGraph V)
   (v : V)
@@ -324,6 +394,23 @@ decreasing_by
     have ⟨_, vnotin⟩ := hv1
     rw [HashSet.mem_toFinset] at vnotin
     trivial
+
+theorem reachability_equiv_1
+    (g : FinGraph V)
+    (v : V)
+    (vInNodes : v ∈ g.nodes)
+    (visited : HashSet V) :
+    (reachability'' g.nodes.size g v visited).toFinset
+    = (reachability' g v vInNodes visited).1.toFinset := by
+  fun_induction reachability' g v vInNodes visited
+  all_goals expose_names
+  · have h : v_1 ∈ visited := by grind
+    unfold reachability''
+    simp [h]
+  · have h : v_1 ∉ visited := by grind
+    unfold reachability''
+    simp [h]
+    sorry
 
 def reachability'_p
   (g : FinGraph V)
